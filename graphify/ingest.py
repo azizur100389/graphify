@@ -7,6 +7,7 @@ import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
+from graphify.log import logger
 from graphify.security import safe_fetch, safe_fetch_text, validate_url
 
 
@@ -198,13 +199,13 @@ def ingest(url: str, target_dir: Path, author: str | None = None, contributor: s
     try:
         if url_type == "pdf":
             out = _download_binary(url, ".pdf", target_dir)
-            print(f"Downloaded PDF: {out.name}")
+            logger.info("Downloaded PDF: %s", out.name)
             return out
 
         if url_type == "image":
             suffix = Path(urllib.parse.urlparse(url).path).suffix or ".jpg"
             out = _download_binary(url, suffix, target_dir)
-            print(f"Downloaded image: {out.name}")
+            logger.info("Downloaded image: %s", out.name)
             return out
 
         if url_type == "tweet":
@@ -225,7 +226,7 @@ def ingest(url: str, target_dir: Path, author: str | None = None, contributor: s
         counter += 1
 
     out_path.write_text(content, encoding="utf-8")
-    print(f"Saved {url_type}: {out_path.name}")
+    logger.info("Saved %s: %s", url_type, out_path.name)
     return out_path
 
 
@@ -288,4 +289,4 @@ if __name__ == "__main__":
     parser.add_argument("--contributor", help="Contributor name for team graphs")
     args = parser.parse_args()
     out = ingest(args.url, Path(args.target_dir), author=args.author, contributor=args.contributor)
-    print(f"Ready for graphify: {out}")
+    logger.info("Ready for graphify: %s", out)

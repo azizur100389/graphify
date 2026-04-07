@@ -113,7 +113,8 @@ def test_print_benchmark_no_crash(tmp_path, capsys):
     assert "reduction" in out.lower()
     assert "x" in out
 
-def test_print_benchmark_error_message(capsys):
-    print_benchmark({"error": "test error message"})
-    out = capsys.readouterr().out
-    assert "test error message" in out
+def test_print_benchmark_error_message(caplog):
+    import logging
+    with caplog.at_level(logging.ERROR, logger="graphify"):
+        print_benchmark({"error": "test error message"})
+    assert "test error message" in caplog.text

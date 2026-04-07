@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
+from graphify.log import logger
 
 
 _CHARS_PER_TOKEN = 4  # standard approximation
@@ -111,16 +112,21 @@ def run_benchmark(
 def print_benchmark(result: dict) -> None:
     """Print a human-readable benchmark report."""
     if "error" in result:
-        print(f"Benchmark error: {result['error']}")
+        logger.error("Benchmark error: %s", result["error"])
         return
 
-    print(f"\ngraphify token reduction benchmark")
-    print(f"{'─' * 50}")
-    print(f"  Corpus:          {result['corpus_words']:,} words → ~{result['corpus_tokens']:,} tokens (naive)")
-    print(f"  Graph:           {result['nodes']:,} nodes, {result['edges']:,} edges")
-    print(f"  Avg query cost:  ~{result['avg_query_tokens']:,} tokens")
-    print(f"  Reduction:       {result['reduction_ratio']}x fewer tokens per query")
-    print(f"\n  Per question:")
+    lines = [
+        "",
+        "graphify token reduction benchmark",
+        "─" * 50,
+        f"  Corpus:          {result['corpus_words']:,} words → ~{result['corpus_tokens']:,} tokens (naive)",
+        f"  Graph:           {result['nodes']:,} nodes, {result['edges']:,} edges",
+        f"  Avg query cost:  ~{result['avg_query_tokens']:,} tokens",
+        f"  Reduction:       {result['reduction_ratio']}x fewer tokens per query",
+        "",
+        "  Per question:",
+    ]
     for p in result["per_question"]:
-        print(f"    [{p['reduction']}x] {p['question'][:55]}")
-    print()
+        lines.append(f"    [{p['reduction']}x] {p['question'][:55]}")
+    lines.append("")
+    logger.info("\n".join(lines))

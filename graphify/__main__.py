@@ -1,11 +1,14 @@
 """graphify CLI - `graphify install` sets up the Claude Code skill."""
 from __future__ import annotations
 import json
+import logging
 import platform
 import re
 import shutil
 import sys
 from pathlib import Path
+
+from graphify.log import logger, set_verbosity
 
 _SETTINGS_HOOK = {
     "matcher": "Glob|Grep",
@@ -66,22 +69,19 @@ _PLATFORM_CONFIG: dict[str, dict] = {
 
 def install(platform: str = "claude") -> None:
     if platform not in _PLATFORM_CONFIG:
-        print(
-            f"error: unknown platform '{platform}'. Choose from: {', '.join(_PLATFORM_CONFIG)}",
-            file=sys.stderr,
-        )
+        logger.error("unknown platform '%s'. Choose from: %s", platform, ", ".join(_PLATFORM_CONFIG))
         sys.exit(1)
 
     cfg = _PLATFORM_CONFIG[platform]
     skill_src = Path(__file__).parent / cfg["skill_file"]
     if not skill_src.exists():
-        print(f"error: {cfg['skill_file']} not found in package - reinstall graphify", file=sys.stderr)
+        logger.error("%s not found in package - reinstall graphify", cfg["skill_file"])
         sys.exit(1)
 
     skill_dst = Path.home() / cfg["skill_dst"]
     skill_dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(skill_src, skill_dst)
-    print(f"  skill installed  →  {skill_dst}")
+    logger.info("  skill installed  →  %s", skill_dst)
 
     if cfg["claude_md"]:
         # Register in ~/.claude/CLAUDE.md (Claude Code only)
@@ -89,20 +89,20 @@ def install(platform: str = "claude") -> None:
         if claude_md.exists():
             content = claude_md.read_text(encoding="utf-8")
             if "graphify" in content:
-                print(f"  CLAUDE.md        →  already registered (no change)")
+                logger.info("  CLAUDE.md        →  already registered (no change)")
             else:
                 claude_md.write_text(content.rstrip() + _SKILL_REGISTRATION, encoding="utf-8")
-                print(f"  CLAUDE.md        →  skill registered in {claude_md}")
+                logger.info("  CLAUDE.md        →  skill registered in %s", claude_md)
         else:
             claude_md.parent.mkdir(parents=True, exist_ok=True)
             claude_md.write_text(_SKILL_REGISTRATION.lstrip(), encoding="utf-8")
-            print(f"  CLAUDE.md        →  created at {claude_md}")
+            logger.info("  CLAUDE.md        →  created at %s", claude_md)
 
-    print()
-    print("Done. Open your AI coding assistant and type:")
-    print()
-    print("  /graphify .")
-    print()
+    logger.info("")
+    logger.info("Done. Open your AI coding assistant and type:")
+    logger.info("")
+    logger.info("  /graphify .")
+    logger.info("")
 
 
 _CLAUDE_MD_SECTION = """\
@@ -141,20 +141,20 @@ def _agents_install(project_dir: Path, platform: str) -> None:
     if target.exists():
         content = target.read_text(encoding="utf-8")
         if _AGENTS_MD_MARKER in content:
-            print(f"graphify already configured in AGENTS.md")
+            logger.info("graphify already configured in AGENTS.md")
             return
         new_content = content.rstrip() + "\n\n" + _AGENTS_MD_SECTION
     else:
         new_content = _AGENTS_MD_SECTION
 
     target.write_text(new_content, encoding="utf-8")
-    print(f"graphify section written to {target.resolve()}")
-    print()
-    print(f"{platform.capitalize()} will now check the knowledge graph before answering")
-    print("codebase questions and rebuild it after code changes.")
-    print()
-    print("Note: unlike Claude Code, there is no PreToolUse hook equivalent for")
-    print(f"{platform.capitalize()} — the AGENTS.md rules are the always-on mechanism.")
+    logger.info("graphify section written to %s", target.resolve())
+    logger.info("")
+    logger.info("%s will now check the knowledge graph before answering", platform.capitalize())
+    logger.info("codebase questions and rebuild it after code changes.")
+    logger.info("")
+    logger.info("Note: unlike Claude Code, there is no PreToolUse hook equivalent for")
+    logger.info("%s — the AGENTS.md rules are the always-on mechanism.", platform.capitalize())
 
 
 def _agents_uninstall(project_dir: Path) -> None:
@@ -162,12 +162,12 @@ def _agents_uninstall(project_dir: Path) -> None:
     target = (project_dir or Path(".")) / "AGENTS.md"
 
     if not target.exists():
-        print("No AGENTS.md found in current directory - nothing to do")
+        logger.info("No AGENTS.md found in current directory - nothing to do")
         return
 
     content = target.read_text(encoding="utf-8")
     if _AGENTS_MD_MARKER not in content:
-        print("graphify section not found in AGENTS.md - nothing to do")
+        logger.info("graphify section not found in AGENTS.md - nothing to do")
         return
 
     cleaned = re.sub(
@@ -178,10 +178,10 @@ def _agents_uninstall(project_dir: Path) -> None:
     ).rstrip()
     if cleaned:
         target.write_text(cleaned + "\n", encoding="utf-8")
-        print(f"graphify section removed from {target.resolve()}")
+        logger.info("graphify section removed from %s", target.resolve())
     else:
         target.unlink()
-        print(f"AGENTS.md was empty after removal - deleted {target.resolve()}")
+        logger.info("AGENTS.md was empty after removal - deleted %s", target.resolve())
 
 
 def claude_install(project_dir: Path | None = None) -> None:
@@ -191,21 +191,21 @@ def claude_install(project_dir: Path | None = None) -> None:
     if target.exists():
         content = target.read_text(encoding="utf-8")
         if _CLAUDE_MD_MARKER in content:
-            print("graphify already configured in CLAUDE.md")
+            logger.info("graphify already configured in CLAUDE.md")
             return
         new_content = content.rstrip() + "\n\n" + _CLAUDE_MD_SECTION
     else:
         new_content = _CLAUDE_MD_SECTION
 
     target.write_text(new_content, encoding="utf-8")
-    print(f"graphify section written to {target.resolve()}")
+    logger.info("graphify section written to %s", target.resolve())
 
     # Also write Claude Code PreToolUse hook to .claude/settings.json
     _install_claude_hook(project_dir or Path("."))
 
-    print()
-    print("Claude Code will now check the knowledge graph before answering")
-    print("codebase questions and rebuild it after code changes.")
+    logger.info("")
+    logger.info("Claude Code will now check the knowledge graph before answering")
+    logger.info("codebase questions and rebuild it after code changes.")
 
 
 def _install_claude_hook(project_dir: Path) -> None:
@@ -226,12 +226,12 @@ def _install_claude_hook(project_dir: Path) -> None:
 
     # Check if already installed
     if any(h.get("matcher") == "Glob|Grep" and "graphify" in str(h) for h in pre_tool):
-        print(f"  .claude/settings.json  →  hook already registered (no change)")
+        logger.info("  .claude/settings.json  →  hook already registered (no change)")
         return
 
     pre_tool.append(_SETTINGS_HOOK)
     settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
-    print(f"  .claude/settings.json  →  PreToolUse hook registered")
+    logger.info("  .claude/settings.json  →  PreToolUse hook registered")
 
 
 def _uninstall_claude_hook(project_dir: Path) -> None:
@@ -249,7 +249,7 @@ def _uninstall_claude_hook(project_dir: Path) -> None:
         return
     settings["hooks"]["PreToolUse"] = filtered
     settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
-    print(f"  .claude/settings.json  →  PreToolUse hook removed")
+    logger.info("  .claude/settings.json  →  PreToolUse hook removed")
 
 
 def claude_uninstall(project_dir: Path | None = None) -> None:
@@ -257,12 +257,12 @@ def claude_uninstall(project_dir: Path | None = None) -> None:
     target = (project_dir or Path(".")) / "CLAUDE.md"
 
     if not target.exists():
-        print("No CLAUDE.md found in current directory - nothing to do")
+        logger.info("No CLAUDE.md found in current directory - nothing to do")
         return
 
     content = target.read_text(encoding="utf-8")
     if _CLAUDE_MD_MARKER not in content:
-        print("graphify section not found in CLAUDE.md - nothing to do")
+        logger.info("graphify section not found in CLAUDE.md - nothing to do")
         return
 
     # Remove the ## graphify section: from the marker to the next ## heading or EOF
@@ -274,15 +274,23 @@ def claude_uninstall(project_dir: Path | None = None) -> None:
     ).rstrip()
     if cleaned:
         target.write_text(cleaned + "\n", encoding="utf-8")
-        print(f"graphify section removed from {target.resolve()}")
+        logger.info("graphify section removed from %s", target.resolve())
     else:
         target.unlink()
-        print(f"CLAUDE.md was empty after removal - deleted {target.resolve()}")
+        logger.info("CLAUDE.md was empty after removal - deleted %s", target.resolve())
 
     _uninstall_claude_hook(project_dir or Path("."))
 
 
 def main() -> None:
+    # Handle global flags before dispatching subcommands
+    if "--verbose" in sys.argv:
+        sys.argv.remove("--verbose")
+        set_verbosity(verbose=True)
+    elif "--quiet" in sys.argv:
+        sys.argv.remove("--quiet")
+        set_verbosity(quiet=True)
+
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print("Usage: graphify <command>")
         print()
@@ -333,7 +341,7 @@ def main() -> None:
         elif subcmd == "uninstall":
             claude_uninstall()
         else:
-            print("Usage: graphify claude [install|uninstall]", file=sys.stderr)
+            logger.error("Usage: graphify claude [install|uninstall]")
             sys.exit(1)
     elif cmd in ("codex", "opencode", "claw", "droid"):
         subcmd = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -342,7 +350,7 @@ def main() -> None:
         elif subcmd == "uninstall":
             _agents_uninstall(Path("."))
         else:
-            print(f"Usage: graphify {cmd} [install|uninstall]", file=sys.stderr)
+            logger.error("Usage: graphify %s [install|uninstall]", cmd)
             sys.exit(1)
     elif cmd == "hook":
         from graphify.hooks import install as hook_install, uninstall as hook_uninstall, status as hook_status
@@ -354,11 +362,11 @@ def main() -> None:
         elif subcmd == "status":
             print(hook_status(Path(".")))
         else:
-            print("Usage: graphify hook [install|uninstall|status]", file=sys.stderr)
+            logger.error("Usage: graphify hook [install|uninstall|status]")
             sys.exit(1)
     elif cmd == "query":
         if len(sys.argv) < 3:
-            print("Usage: graphify query \"<question>\" [--dfs] [--budget N] [--graph path]", file=sys.stderr)
+            logger.error("Usage: graphify query \"<question>\" [--dfs] [--budget N] [--graph path]")
             sys.exit(1)
         from graphify.serve import _load_graph, _score_nodes, _bfs, _dfs, _subgraph_to_text
         question = sys.argv[2]
@@ -400,8 +408,8 @@ def main() -> None:
         result = run_benchmark(graph_path, corpus_words=corpus_words)
         print_benchmark(result)
     else:
-        print(f"error: unknown command '{cmd}'", file=sys.stderr)
-        print("Run 'graphify --help' for usage.", file=sys.stderr)
+        logger.error("unknown command '%s'", cmd)
+        logger.error("Run 'graphify --help' for usage.")
         sys.exit(1)
 
 

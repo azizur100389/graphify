@@ -4,6 +4,8 @@ import json
 import time
 from pathlib import Path
 
+from graphify.log import logger
+
 
 _WATCHED_EXTENSIONS = {
     ".py", ".ts", ".js", ".go", ".rs", ".java", ".cpp", ".c", ".rb", ".swift", ".kt",
@@ -39,7 +41,7 @@ def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:
         ]
 
         if not code_files:
-            print("[graphify watch] No code files found - nothing to rebuild.")
+            logger.info("watch: No code files found - nothing to rebuild.")
             return False
 
         result = extract(code_files)
@@ -71,13 +73,13 @@ def _rebuild_code(watch_path: Path, *, follow_symlinks: bool = False) -> bool:
         if flag.exists():
             flag.unlink()
 
-        print(f"[graphify watch] Rebuilt: {G.number_of_nodes()} nodes, "
-              f"{G.number_of_edges()} edges, {len(communities)} communities")
-        print(f"[graphify watch] graph.json and GRAPH_REPORT.md updated in {out}")
+        logger.info("watch: Rebuilt: %d nodes, %d edges, %d communities",
+                    G.number_of_nodes(), G.number_of_edges(), len(communities))
+        logger.info("watch: graph.json and GRAPH_REPORT.md updated in %s", out)
         return True
 
     except Exception as exc:
-        print(f"[graphify watch] Rebuild failed: {exc}")
+        logger.error("watch: Rebuild failed: %s", exc)
         return False
 
 
@@ -86,10 +88,10 @@ def _notify_only(watch_path: Path) -> None:
     flag = watch_path / "graphify-out" / "needs_update"
     flag.parent.mkdir(parents=True, exist_ok=True)
     flag.write_text("1")
-    print(f"\n[graphify watch] New or changed files detected in {watch_path}")
-    print("[graphify watch] Non-code files changed - semantic re-extraction requires LLM.")
-    print("[graphify watch] Run `/graphify --update` in Claude Code to update the graph.")
-    print(f"[graphify watch] Flag written to {flag}")
+    logger.info("watch: New or changed files detected in %s", watch_path)
+    logger.info("watch: Non-code files changed - semantic re-extraction requires LLM.")
+    logger.info("watch: Run `/graphify --update` in Claude Code to update the graph.")
+    logger.info("watch: Flag written to %s", flag)
 
 
 def _has_non_code(changed_paths: list[Path]) -> bool:
@@ -138,10 +140,10 @@ def watch(watch_path: Path, debounce: float = 3.0) -> None:
     observer.schedule(handler, str(watch_path), recursive=True)
     observer.start()
 
-    print(f"[graphify watch] Watching {watch_path.resolve()} - press Ctrl+C to stop")
-    print(f"[graphify watch] Code changes rebuild graph automatically. "
-          f"Doc/image changes require /graphify --update.")
-    print(f"[graphify watch] Debounce: {debounce}s")
+    logger.info("watch: Watching %s - press Ctrl+C to stop", watch_path.resolve())
+    logger.info("watch: Code changes rebuild graph automatically. "
+                "Doc/image changes require /graphify --update.")
+    logger.info("watch: Debounce: %ss", debounce)
 
     try:
         while True:
@@ -150,13 +152,13 @@ def watch(watch_path: Path, debounce: float = 3.0) -> None:
                 pending = False
                 batch = list(changed)
                 changed.clear()
-                print(f"\n[graphify watch] {len(batch)} file(s) changed")
+                logger.info("watch: %d file(s) changed", len(batch))
                 if _has_non_code(batch):
                     _notify_only(watch_path)
                 else:
                     _rebuild_code(watch_path)
     except KeyboardInterrupt:
-        print("\n[graphify watch] Stopped.")
+        logger.info("watch: Stopped.")
     finally:
         observer.stop()
         observer.join()
