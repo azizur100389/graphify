@@ -21,8 +21,8 @@
 #    before any graph construction happens.
 #
 from __future__ import annotations
-import sys
 import networkx as nx
+from .log import logger
 from .validate import validate_extraction
 
 
@@ -31,7 +31,7 @@ def build_from_json(extraction: dict) -> nx.Graph:
     # Dangling edges (stdlib/external imports) are expected - only warn about real schema errors.
     real_errors = [e for e in errors if "does not match any node id" not in e]
     if real_errors:
-        print(f"[graphify] Extraction warning ({len(real_errors)} issues): {real_errors[0]}", file=sys.stderr)
+        logger.warning("Extraction warning (%d issues): %s", len(real_errors), real_errors[0])
     G = nx.Graph()
     for node in extraction.get("nodes", []):
         G.add_node(node["id"], **{k: v for k, v in node.items() if k != "id"})

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 import networkx as nx
 from networkx.readwrite import json_graph
+from graphify.log import logger
 from graphify.security import validate_graph_path, sanitize_label
 
 
@@ -14,10 +15,10 @@ def _load_graph(graph_path: str) -> nx.Graph:
         data = json.loads(safe.read_text())
         return json_graph.node_link_graph(data, edges="links")
     except (ValueError, FileNotFoundError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        logger.error("%s", exc)
         sys.exit(1)
     except json.JSONDecodeError as exc:
-        print(f"error: graph.json is corrupted ({exc}). Re-run /graphify to rebuild.", file=sys.stderr)
+        logger.error("graph.json is corrupted (%s). Re-run /graphify to rebuild.", exc)
         sys.exit(1)
 
 
